@@ -10,10 +10,12 @@ async def lifespan(app: FastAPI):
     yield
     await prisma.disconnect()
 
-@app.get("/")
-def root():
-    return {"message": "Welcome to AI Integration Platform API"}
+app = FastAPI(title="AI Integration Platform API", lifespan=lifespan)
 
+# Routes
+app.include_router(api_router, prefix="/api/v1")
+
+# Health Check
 @app.get("/health")
 def health_check():
     return {"status": "Welcome"}
