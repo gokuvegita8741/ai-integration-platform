@@ -1,0 +1,14 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "dev": "poetry run uvicorn app.main:app --reload --port 8000",
+    "build": "echo \"No build step for api\"",
+    "lint": "echo \"No lint step yet\""
+  },
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.17.1"
+}
