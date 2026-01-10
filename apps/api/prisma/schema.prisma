@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  fullName  String
+  createdAt DateTime @default(now())
+
+  chatbot   UserChatbot?
+  chats     Chat[]
+}
+
+model UserChatbot {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  chats     Chat[]
+}
+
+model Chat {
+  id            String   @id @default(uuid())
+  userId        String
+  chatbotId     String
+
+  source        ChatSource
+  websiteDomain String?
+  pagePath      String?
+  projectName   String?
+
+  createdAt     DateTime @default(now())
+
+  user          User         @relation(fields: [userId], references: [id])
+  chatbot       UserChatbot  @relation(fields: [chatbotId], references: [id])
+  messages      ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  sender    MessageSender
+  message   String
+  createdAt DateTime @default(now())
+
+  chat      Chat     @relation(fields: [chatId], references: [id])
+}
+
+enum ChatSource {
+  standalone
+  iframe
+}
+
+enum MessageSender {
+  user
+  assistant
+}
