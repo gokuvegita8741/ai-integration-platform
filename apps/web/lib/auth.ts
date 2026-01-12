@@ -11,7 +11,7 @@ export const authOptions: NextAuthOptions = {
             },
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) {
-                    return null;
+                    throw new Error('Email and password are required');
                 }
 
                 try {
@@ -28,7 +28,7 @@ export const authOptions: NextAuthOptions = {
                     });
 
                     if (!res.ok) {
-                        return null;
+                        throw new Error('Invalid email or password');
                     }
 
                     const data = await res.json();
@@ -42,7 +42,7 @@ export const authOptions: NextAuthOptions = {
                     };
                 } catch (error) {
                     console.error("Auth error:", error);
-                    return null;
+                    throw new Error(`Error in auth: ${error}`);
                 }
             },
         }),
@@ -53,6 +53,8 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
+                token.email = (user as any).email;
+                token.name = (user as any).name;
                 token.accessToken = (user as any).accessToken;
                 token.id = (user as any).id;
             }
@@ -61,6 +63,8 @@ export const authOptions: NextAuthOptions = {
         async session({ session, token }) {
             session.accessToken = token.accessToken as string;
             session.user.id = token.id as string;
+            session.user.email = token.email as string;
+            session.user.name = token.name as string;
             return session;
         },
     },

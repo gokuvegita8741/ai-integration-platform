@@ -9,9 +9,8 @@ import { Label } from '@/components/ui/label';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { User, Mail, Lock } from 'lucide-react';
+import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
 import Register from './Register';
-import { cn } from '@/lib/utils';
 
 const loginSchema = z.object({
     email: z.string().email('Invalid email address'),
@@ -23,6 +22,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function Login() {
     const [isRegistering, setIsRegistering] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
     const {
@@ -108,7 +108,7 @@ export default function Login() {
                                             type="email"
                                             placeholder="Email"
                                             {...register('email')}
-                                            className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:ring-1 focus:ring-white/20 focus:bg-white/[0.1] hover:bg-white/[0.1] transition-all duration-300 font-light"
+                                            className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
                                         />
                                     </div>
                                     {errors.email && (
@@ -132,11 +132,23 @@ export default function Login() {
                                         <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
                                         <Input
                                             id="password"
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             placeholder="Password"
                                             {...register('password')}
-                                            className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:ring-1 focus:ring-white/20 focus:bg-white/[0.1] hover:bg-white/[0.1] transition-all duration-300 font-light"
+                                            className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
                                         />
+                                        <button
+                                            type="button"
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                            onClick={() => setShowPassword((prev) => !prev)}
+                                            tabIndex={-1}
+                                            >
+                                            {showPassword ? (
+                                                <EyeOff className="h-4 w-4" />
+                                            ) : (
+                                                <Eye className="h-4 w-4" />
+                                            )}
+                                        </button>
                                     </div>
                                     {errors.password && (
                                         <p
@@ -162,7 +174,7 @@ export default function Login() {
 
                             <Button
                                 type="submit"
-                                className="w-full h-14 rounded-full text-base font-semibold text-white shadow-lg shadow-indigo-500/20 border-none transition-all duration-300 hover:-translate-y-0.5"
+                                className="w-full h-11 rounded-full text-base font-semibold text-white shadow-lg shadow-indigo-500/20 border-none transition-all duration-300 hover:-translate-y-0.5"
                                 style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
                                 disabled={isLoading}
                             >

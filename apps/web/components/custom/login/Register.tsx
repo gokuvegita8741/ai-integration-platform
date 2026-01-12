@@ -6,9 +6,10 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { User, Mail, Lock } from "lucide-react";
+import { useState, useTransition } from "react";
+import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { registerUser } from "@/actions/auth";
 
 /* 🔧 FIX: schema aligned with backend */
 const registerSchema = z.object({
@@ -20,7 +21,9 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register({ onToggle }: { onToggle: () => void }) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
   const {
     register,
     handleSubmit,
@@ -29,33 +32,30 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
     resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = async (data: RegisterFormValues) => {
-    setIsLoading(true);
+  const onSubmit = (data: RegisterFormValues) => {
+    const formData = new FormData();
+    formData.append("fullName", data.fullName);
+    formData.append("email", data.email);
+    formData.append("password", data.password);
 
-    try {
-      const res = await fetch(
-        "/api/auth/register",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+    startTransition(async () => {
+      try {
+        const result = await registerUser(formData);
+
+        if (result.success) {
+          await signIn("credentials", {
+            email: data.email,
+            password: data.password,
+            callbackUrl: "/",
+          });
         }
-      );
-
-      if (res.ok) {
-        await signIn("credentials", {
-          email: data.email,
-          password: data.password,
-          redirect: false,
-        });
-      } else {
-        console.error("Registration failed");
+        else{
+          throw new Error("Registration failed");
+        }
+      } catch (err: any) {
+        alert(err.message);
       }
-    } catch (error) {
-      console.error("Registration failed", error);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
@@ -115,7 +115,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                     <Input
                       {...register("fullName")}
                       placeholder="Full Name"
-                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:ring-1 focus:ring-white/20 focus:bg-white/[0.1] hover:bg-white/[0.1] transition-all duration-300 font-light"
+                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
                     />
                   </div>
                   {errors.fullName && (
@@ -133,7 +133,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                       {...register("email")}
                       placeholder="Email"
                       type="email"
-                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:ring-1 focus:ring-white/20 focus:bg-white/[0.1] hover:bg-white/[0.1] transition-all duration-300 font-light"
+                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
                     />
                   </div>
                   {errors.email && (
@@ -149,10 +149,22 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                     <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500 group-focus-within:text-zinc-300 transition-colors" />
                     <Input
                       {...register("password")}
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       placeholder="Password"
-                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:ring-1 focus:ring-white/20 focus:bg-white/[0.1] hover:bg-white/[0.1] transition-all duration-300 font-light"
+                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 transition-all duration-300 font-light"
                     />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
                   </div>
                   {errors.password && (
                     <p className="text-xs ml-4 font-medium text-indigo-400">
@@ -164,13 +176,13 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
 
               <Button
                 type="submit"
-                disabled={isLoading}
-                className="w-full h-14 rounded-full text-base font-semibold text-white shadow-lg shadow-indigo-500/20 border-none transition-all duration-300 hover:-translate-y-0.5"
+                disabled={isPending}
+                className="w-full h-11 rounded-full text-base font-semibold text-white shadow-lg shadow-indigo-500/20 border-none transition-all duration-300 hover:-translate-y-0.5"
                 style={{
                   background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
                 }}
               >
-                {isLoading ? "Creating Account..." : "Sign Up"}
+                {isPending ? "Creating Account..." : "Sign Up"}
               </Button>
             </form>
 
