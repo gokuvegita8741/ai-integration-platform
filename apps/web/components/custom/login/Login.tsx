@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
 import Register from './Register';
+import { notifications } from '@mantine/notifications';
 
 const loginSchema = z.object({
     email: z.string().email('Invalid email address'),
@@ -44,13 +45,31 @@ export default function Login() {
             });
 
             if (result?.ok) {
+                notifications.show({
+                    title: 'Success',
+                    message: 'Login successful! Redirecting...',
+                    color: 'green',
+                    position: 'top-right',
+                });
                 router.push('/');
             } else {
-                console.error('Login failed:', result?.error || 'Unknown error');
-                // TODO: Show user-friendly error message
+                // Extract error message from result
+                const errorMessage = result?.error || 'Invalid email or password';
+                notifications.show({
+                    title: 'Login Failed',
+                    message: errorMessage,
+                    color: 'red',
+                    position: 'top-right',
+                });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Login failed', error);
+            notifications.show({
+                title: 'Error',
+                message: error.message || 'An unexpected error occurred',
+                color: 'red',
+                position: 'top-right',
+            });
         } finally {
             setIsLoading(false);
         }
@@ -142,7 +161,7 @@ export default function Login() {
                                             className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                                             onClick={() => setShowPassword((prev) => !prev)}
                                             tabIndex={-1}
-                                            >
+                                        >
                                             {showPassword ? (
                                                 <EyeOff className="h-4 w-4" />
                                             ) : (

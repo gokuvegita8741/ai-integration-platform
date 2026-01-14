@@ -10,6 +10,7 @@ import { useState, useTransition } from "react";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { registerUser } from "@/actions/auth";
+import { notifications } from '@mantine/notifications';
 
 /* 🔧 FIX: schema aligned with backend */
 const registerSchema = z.object({
@@ -43,17 +44,28 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
         const result = await registerUser(formData);
 
         if (result.success) {
+          notifications.show({
+            title: 'Success',
+            message: 'Account created successfully! Logging you in...',
+            color: 'green',
+            position: 'top-right',
+          });
+
           await signIn("credentials", {
             email: data.email,
             password: data.password,
             callbackUrl: "/",
           });
-        }
-        else{
+        } else {
           throw new Error("Registration failed");
         }
       } catch (err: any) {
-        alert(err.message);
+        notifications.show({
+          title: 'Registration Failed',
+          message: err.message || 'An error occurred during registration',
+          color: 'red',
+          position: 'top-right',
+        });
       }
     });
   };

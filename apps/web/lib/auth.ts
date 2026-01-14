@@ -15,23 +15,12 @@ export const authOptions: NextAuthOptions = {
                 }
 
                 try {
-                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-                    const res = await fetch(`${backendUrl}/api/v1/auth/login`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            email: credentials.email,
-                            password: credentials.password,
-                        }),
+                    const { default: api } = await import('@/lib/api');
+
+                    const { data } = await api.post('/api/v1/auth/login', {
+                        email: credentials.email,
+                        password: credentials.password,
                     });
-
-                    if (!res.ok) {
-                        throw new Error('Invalid email or password');
-                    }
-
-                    const data = await res.json();
 
                     // Return user object
                     return {
@@ -40,9 +29,10 @@ export const authOptions: NextAuthOptions = {
                         name: data.fullName,
                         accessToken: data.access_token,
                     };
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Auth error:", error);
-                    throw new Error(`Error in auth: ${error}`);
+                    // Throw a user-friendly error message
+                    throw new Error(error.message || 'Invalid email or password');
                 }
             },
         }),

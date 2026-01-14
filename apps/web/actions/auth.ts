@@ -1,9 +1,6 @@
 "use server";
 
 async function registerUser(formData: FormData) {
-    const backendUrl =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
     const email = formData.get("email");
     const password = formData.get("password");
     const fullName = formData.get("fullName");
@@ -13,32 +10,22 @@ async function registerUser(formData: FormData) {
     }
 
     try {
-        const res = await fetch(`${backendUrl}/api/v1/auth/register`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                email,
-                password,
-                fullName,
-            }),
-            cache: "no-store",
+        const { default: api } = await import('@/lib/api');
+
+        const { data } = await api.post('/api/v1/auth/register', {
+            email,
+            password,
+            fullName,
         });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            throw new Error(data.detail || "Registration failed");
-        }
 
         return {
             success: true,
             user: data,
         };
-    } catch (error) {
+    } catch (error: any) {
         console.log(error);
-        throw new Error("Registration failed");
+        // Return the actual error message from the server
+        throw new Error(error.message || 'Registration failed');
     }
 }
 
