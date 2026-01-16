@@ -51,7 +51,7 @@ export default function Login() {
                     color: 'green',
                     position: 'top-right',
                 });
-                router.push('/');
+                router.push('/chatbot');
             } else {
                 // Extract error message from result
                 const errorMessage = result?.error || 'Invalid email or password';

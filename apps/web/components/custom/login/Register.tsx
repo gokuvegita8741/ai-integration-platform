@@ -54,7 +54,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
           await signIn("credentials", {
             email: data.email,
             password: data.password,
-            callbackUrl: "/",
+            callbackUrl: "/chatbot",
           });
         } else {
           throw new Error("Registration failed");
@@ -99,7 +99,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
           }}
         />
 
-        <div className="w-full max-w-[420px] p-10 bg-black/40 backdrop-blur-3xl border border-white/[0.1] rounded-3xl shadow-2xl relative flex flex-col gap-8">
+        <div className="w-full max-w-[420px] p-10 bg-black/40 backdrop-blur-3xl border border-white/10 rounded-3xl shadow-2xl relative flex flex-col gap-8">
           {/* Professional Radial Overlay */}
           <div
             className="absolute inset-0 rounded-3xl pointer-events-none"
@@ -108,7 +108,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                 "radial-gradient(circle at top left, rgba(79, 70, 229, 0.15), transparent 60%)",
             }}
           />
-          <div className="absolute inset-0 rounded-3xl bg-gradient-to-b from-white/[0.05] to-transparent pointer-events-none" />
+          <div className="absolute inset-0 rounded-3xl bg-linear-to-b from-white/5 to-transparent pointer-events-none" />
 
           <div className="text-center space-y-2 relative z-10">
             <h1 className="text-3xl font-bold text-white tracking-tight">
@@ -127,7 +127,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                     <Input
                       {...register("fullName")}
                       placeholder="Full Name"
-                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
+                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/10 transition-all duration-300 font-light"
                     />
                   </div>
                   {errors.fullName && (
@@ -145,7 +145,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
                       {...register("email")}
                       placeholder="Email"
                       type="email"
-                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/[0.1] transition-all duration-300 font-light"
+                      className="pl-12 h-14 bg-white/[0.07] border-transparent text-white placeholder:text-zinc-500 rounded-full focus:outline-none focus-visible:ring-2 hover:bg-white/10 transition-all duration-300 font-light"
                     />
                   </div>
                   {errors.email && (

@@ -8,6 +8,8 @@ export function LogoutButton() {
         <Button
             onClick={() => signOut({ callbackUrl: "/auth/login" })}
             variant="destructive"
+            size={"sm"}
+            className="text-xs px-2 py-0"
         >
             Sign Out
         </Button>
