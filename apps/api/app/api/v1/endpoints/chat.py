@@ -65,7 +65,7 @@ async def rename_chat(
         data={'name': chat_in.name}
     )
     
-    return {"success": True}
+    return {"success": True,"chatId": chat_id,"message": "Chat renamed to {} successfully".format(chat_in.name)}
 
 @router.delete("/{chat_id}")
 async def delete_chat(
@@ -88,7 +88,7 @@ async def delete_chat(
     await prisma.chatmessage.delete_many(where={'chatId': chat_id})
     await prisma.chat.delete(where={'id': chat_id})
     
-    return {"success": True}
+    return {"success": True,"chatId": chat_id,"message": "Chat deleted successfully"}
 
 
 @router.post("/message", response_model=ChatResponse)
@@ -133,42 +133,6 @@ async def send_chat_message(
     )
     
     # 4. Fetch Chat Context (Last 5 messages)
-    # We just inserted the user message, so it will be included in the top 5 desc.
-    # Logic note: previous_messages_db includes the message we just inserted at index 0 (desc).
-    # The requirement says: "Context: Last 5 messages... Append current user message at the end".
-    #
-    # Wait, if we fetch AFTER creating the message, the "current user message" is inside `previous_messages_db[0]`.
-    #
-    # Let's adjust slightly for safety to match the prompt rules specifically: "Append the current user message at the end".
-    # If we fetch including the current message, we might duplicate it if we also append it. 
-    # BUT, the robust way is: 
-    # Fetch EXISTING messages (excluding current). 
-    # The current message is `chat_in.message`.
-    #
-    # Actually, simpler: 
-    # Fetch ALL last 5 (including the one we just saved).
-    # Then just send `previous_messages_db` to LLM Service, but `process_chat_request` logic appends `message` manually.
-    # Ah, `process_chat_request` takes `message` AND `previous_messages`.
-    # So we should fetch context *excluding* the one we just saved??
-    # Or just fetch top 6, ignore top 1?
-    #
-    # Let's refine: 
-    # The requirement says "Fetch last 5... Then append current user message". 
-    # The "Last 5" usually means "Previous history capable of being context".
-    # Since we SAVED the current message already (Step 3), finding recent messages will include it.
-    #
-    # Let's fetch the messages, filter out the one we just created (by ID or assumption it is top 1), 
-    # OR change Step 3 to be AFTER context fetch? (But requirement says "Save user message... then call LLM").
-    #
-    # Let's use `skip=1` in find_many to skip the just-inserted message?
-    # Or simpler: Fetch limit 6. Filter.
-    #
-    # Actually, `process_chat_request` in `llm.py` logic:
-    #   messages.extend(previous_messages)
-    #   messages.append({"role": "user", "content": message})
-    #
-    # So `previous_messages` MUST NOT include the current message.
-    
     previous_messages_db = await prisma.chatmessage.find_many(
         where={'chatId': chat_id},
         take=5, 
