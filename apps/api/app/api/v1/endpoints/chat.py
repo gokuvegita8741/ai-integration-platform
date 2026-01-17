@@ -56,10 +56,26 @@ async def send_chat_message(
         }
     )
     
-    # 4. Call LLM
-    assistant_reply = await process_chat_request(chat_in.message, chat_in.imageUrl)
+    # 4. Fetch Chat Context (Last 5 messages)
+    previous_messages_db = await prisma.chatmessage.find_many(
+        where={'chatId': chat_id},
+        take=5,
+        order={'createdAt': 'desc'}
+    )
     
-    # 5. Save Assistant Message
+    # Reverse to get oldest -> newest
+    previous_messages_db.reverse()
+    
+    previous_messages = []
+    for msg in previous_messages_db:
+        role = "user" if msg.sender == "user" else "assistant"
+        previous_messages.append({"role": role, "content": msg.message})
+
+
+    # 5. Call LLM with Context
+    assistant_reply = await process_chat_request(chat_in.message, previous_messages)
+    
+    # 6. Save Assistant Message
     assistant_msg = await prisma.chatmessage.create(
         data={
             'chatId': chat_id,

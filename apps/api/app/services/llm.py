@@ -21,15 +21,16 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-async def process_chat_request(message: str,image_url: Optional[str] = None,) -> str:
+async def process_chat_request(message: str, previous_messages: list[dict] = []) -> str:
     """
-    Send a TEXT-ONLY request to OpenRouter using Gemma 3.
+    Send a TEXT-ONLY request to OpenRouter using Gemma 3 with context.
+    previous_messages: list of dicts with 'role' and 'content' keys.
     """
 
     print("[OpenRouter] ================================")
     print("[OpenRouter] Starting chat request")
     print(f"[OpenRouter] Model: {MODEL}")
-    print(f"[OpenRouter] User message: {message}")
+    print(f"[OpenRouter] Context length: {len(previous_messages)}")
     print("[OpenRouter] ================================")
 
     headers = {
@@ -40,19 +41,25 @@ async def process_chat_request(message: str,image_url: Optional[str] = None,) ->
         # "X-Title": "AI Integration Platform",
     }
 
+    # Build messages array
+    messages = [
+        {"role": "system", "content": "You are a helpful AI assistant. Use the previous conversation for context."}
+    ]
+    
+    # Add context
+    messages.extend(previous_messages)
+    
+    # Add current message
+    messages.append({"role": "user", "content": message})
+
     # 🚨 Gemma expects PLAIN STRING content
     payload = {
         "model": MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": message,
-            }
-        ],
+        "messages": messages,
     }
 
     print("[OpenRouter] Payload prepared")
-    print(f"[OpenRouter] Payload preview: {payload}")
+    # print(f"[OpenRouter] Payload preview: {payload}") # Debug logging if needed
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
