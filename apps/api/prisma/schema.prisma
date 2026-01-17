@@ -31,6 +31,7 @@ model Chat {
   id            String   @id @default(uuid())
   userId        String
   chatbotId     String
+  name          String   @default("New Chat")
 
   source        ChatSource
   websiteDomain String?
