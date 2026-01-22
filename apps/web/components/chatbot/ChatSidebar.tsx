@@ -1,6 +1,8 @@
 "use client"
 
 import { Plus, Search, Sparkles, Diamond } from "lucide-react"
+import { useEffect, useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChat } from "./ChatContext"
@@ -15,6 +17,11 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ className, onSelect }: ChatSidebarProps) {
     const { chats, activeChatId, createChat, selectChat } = useChat()
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     const handleSelect = (id: string) => {
         selectChat(id)
@@ -77,7 +84,7 @@ export function ChatSidebar({ className, onSelect }: ChatSidebarProps) {
                                 {chat.title}
                             </h4>
                             <p className="text-[10px] text-zinc-400">
-                                {new Date(chat.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {mounted ? new Date(chat.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </p>
                         </div>
 
@@ -89,14 +96,15 @@ export function ChatSidebar({ className, onSelect }: ChatSidebarProps) {
                             <ChatActions chat={chat} />
                         </div>
                     </div>
-                ))}
-            </div>
+                ))
+                }
+            </div >
 
             {/* Footer */}
-            <div className="p-4 space-y-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/50">
+            < div className="p-4 space-y-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-black/50" >
 
                 {/* Credits Card */}
-                <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 bg-white dark:bg-zinc-900/50">
+                < div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 bg-white dark:bg-zinc-900/50" >
                     <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                         <Diamond className="w-4 h-4" />
                     </div>
@@ -104,13 +112,15 @@ export function ChatSidebar({ className, onSelect }: ChatSidebarProps) {
                         <p className="text-sm font-medium text-zinc-900 dark:text-white">2 Credits</p>
                         <p className="text-xs text-zinc-500">Free tier plan</p>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950">
-                        Buy
-                    </Button>
-                </div>
+                    <Link href="/pricing">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950">
+                            Buy
+                        </Button>
+                    </Link>
+                </div >
 
                 <UserNav />
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
 import Register from './Register';
@@ -24,6 +24,8 @@ export default function Login() {
     const [isRegistering, setIsRegistering] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get('callbackUrl') || '/chatbot';
     const router = useRouter();
 
     const {
@@ -51,7 +53,7 @@ export default function Login() {
                     color: 'green',
                     position: 'top-right',
                 });
-                router.push('/chatbot');
+                router.push(callbackUrl);
             } else {
                 // Extract error message from result
                 const errorMessage = result?.error || 'Invalid email or password';

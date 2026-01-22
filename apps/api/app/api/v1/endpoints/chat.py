@@ -3,13 +3,14 @@ from typing import Any, List
 from app.db import prisma
 from app.api import deps
 from app.schemas.chat import (
-    ChatRequest, 
-    ChatResponse, 
-    ChatMessage, 
-    MessageSender, 
-    ChatCreateRequest, 
+    ChatRequest,
+    ChatResponse,
+    ChatMessage,
+    MessageSender,
+    ChatCreateRequest,
     ChatCreateResponse,
-    ChatRenameRequest
+    ChatRenameRequest,
+    Chat as ChatSchema
 )
 from app.services.llm import process_chat_request
 from prisma import models
@@ -43,6 +44,20 @@ async def create_chat(
     )
     
     return ChatCreateResponse(chatId=chat.id, name=chat.name)
+
+@router.get("/", response_model=List[ChatSchema])
+async def list_chats(
+    current_user: models.User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    List all chats for the current user.
+    """
+    chats = await prisma.chat.find_many(
+        where={'userId': current_user.id},
+        order={'createdAt': 'desc'}
+    )
+
+    return chats
 
 @router.put("/{chat_id}/rename")
 async def rename_chat(
@@ -89,6 +104,28 @@ async def delete_chat(
     await prisma.chat.delete(where={'id': chat_id})
     
     return {"success": True,"chatId": chat_id,"message": "Chat deleted successfully"}
+
+@router.get("/{chat_id}/messages", response_model=List[ChatMessage])
+async def get_chat_messages(
+    chat_id: str,
+    current_user: models.User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Get all messages for a chat.
+    """
+    # Verify ownership
+    chat = await prisma.chat.find_unique(where={'id': chat_id})
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if chat.userId != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    messages = await prisma.chatmessage.find_many(
+        where={'chatId': chat_id},
+        order={'createdAt': 'asc'}
+    )
+
+    return messages
 
 
 @router.post("/message", response_model=ChatResponse)
