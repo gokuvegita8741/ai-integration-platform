@@ -3,6 +3,7 @@
 import { LogOut, Monitor, Moon, Sun, User, Sparkles, Check } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useSession, signOut } from "next-auth/react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -54,13 +55,17 @@ export function UserNav() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                    <DropdownMenuItem>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
+                    <DropdownMenuItem asChild>
+                        <Link href="/profile" className="flex items-center w-full cursor-pointer">
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Profile</span>
+                        </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        <Sparkles className="mr-2 h-4 w-4 text-indigo-500" />
-                        <span>Upgrade to Pro</span>
+                    <DropdownMenuItem asChild>
+                        <Link href="/pricing" className="flex items-center w-full cursor-pointer">
+                            <Sparkles className="mr-2 h-4 w-4 text-indigo-500" />
+                            <span>Upgrade to Pro</span>
+                        </Link>
                     </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />

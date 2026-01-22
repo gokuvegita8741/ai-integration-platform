@@ -27,6 +27,16 @@ class ChatCreateResponse(BaseModel):
 class ChatRenameRequest(BaseModel):
     name: str
 
+class Chat(BaseModel):
+    id: str
+    name: str
+    source: ChatSource
+    websiteDomain: Optional[str] = None
+    pagePath: Optional[str] = None
+    projectName: Optional[str] = None
+    createdAt: datetime
+    updatedAt: datetime
+
 class MessageSender(str, Enum):
     user = "user"
     assistant = "assistant"

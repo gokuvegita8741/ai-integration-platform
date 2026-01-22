@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useSession } from "next-auth/react";
+import api, { setAuthToken } from "@/lib/api";
 import { v4 as uuidv4 } from "uuid";
 
 // --- Types ---
@@ -30,43 +32,98 @@ type ChatContextType = {
     renameChat: (chatId: string, newTitle: string) => void;
 };
 
-// --- Initial Mock Data ---
-const INITIAL_CHAT_ID = uuidv4();
-const INITIAL_CHATS: Chat[] = [
-    {
-        id: INITIAL_CHAT_ID,
-        title: "New Chat",
-        messages: [],
-        createdAt: Date.now(),
-    },
-];
-
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-    const [chats, setChats] = useState<Chat[]>(INITIAL_CHATS);
-    const [activeChatId, setActiveChatId] = useState<string | null>(INITIAL_CHAT_ID);
+    const { data: session, status } = useSession();
+    const [chats, setChats] = useState<Chat[]>([]);
+    const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+
+    // Set auth token
+    useEffect(() => {
+        if (status === 'authenticated' && session?.accessToken) {
+            setAuthToken(session.accessToken as string);
+        } else {
+            setAuthToken(null);
+        }
+    }, [session, status]);
+
+    // Fetch chats on load
+    useEffect(() => {
+        if (status === 'authenticated' && session?.accessToken) {
+            fetchChats();
+        }
+    }, [session, status]);
+
+    const fetchChats = async () => {
+        try {
+            const response = await api.get('/api/v1/chat/');
+            const chatsData: any[] = response.data;
+            const formattedChats: Chat[] = chatsData.map(chat => ({
+                id: chat.id,
+                title: chat.name,
+                messages: [], // Will load messages when selected
+                createdAt: new Date(chat.createdAt).getTime(),
+            }));
+            setChats(formattedChats);
+            if (formattedChats.length > 0 && !activeChatId) {
+                setActiveChatId(formattedChats[0].id);
+            }
+        } catch (error) {
+            console.error('Failed to fetch chats:', error);
+        }
+    };
+
+    const fetchMessages = async (chatId: string) => {
+        try {
+            const response = await api.get(`/api/v1/chat/${chatId}/messages`);
+            const messagesData: any[] = response.data;
+            const formattedMessages: Message[] = messagesData.map(msg => ({
+                id: msg.id,
+                role: msg.sender === 'user' ? 'user' : 'assistant',
+                content: msg.message,
+                createdAt: new Date(msg.createdAt).getTime(),
+            }));
+            setChats(prev => prev.map(chat =>
+                chat.id === chatId ? { ...chat, messages: formattedMessages } : chat
+            ));
+        } catch (error) {
+            console.error('Failed to fetch messages:', error);
+        }
+    };
 
     // Derived state
     const activeChat = chats.find((c) => c.id === activeChatId);
 
-    const createChat = () => {
-        const newChat: Chat = {
-            id: uuidv4(),
-            title: "New Chat",
-            messages: [],
-            createdAt: Date.now(),
-        };
-        setChats((prev) => [newChat, ...prev]);
-        setActiveChatId(newChat.id);
+    const createChat = async () => {
+        try {
+            const response = await api.post('/api/v1/chat/create', {
+                source: 'standalone',
+            });
+            const { chatId, name } = response.data;
+            const newChat: Chat = {
+                id: chatId,
+                title: name,
+                messages: [],
+                createdAt: Date.now(),
+            };
+            setChats((prev) => [newChat, ...prev]);
+            setActiveChatId(newChat.id);
+        } catch (error) {
+            console.error('Failed to create chat:', error);
+        }
     };
 
     const selectChat = (chatId: string) => {
         setActiveChatId(chatId);
+        const chat = chats.find(c => c.id === chatId);
+        if (chat && chat.messages.length === 0) {
+            fetchMessages(chatId);
+        }
     };
 
-    const sendMessage = (content: string) => {
+    const sendMessage = async (content: string) => {
         if (!activeChatId) return;
 
         const userMessage: Message = {
@@ -93,13 +150,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
         setIsLoading(true);
 
-        // Simulate Bot Response
-        setTimeout(() => {
+        try {
+            const response = await api.post('/api/v1/chat/message', {
+                chatId: activeChatId,
+                message: content,
+            });
+            const { message: assistantMessage, name } = response.data;
+
             const botMessage: Message = {
-                id: uuidv4(),
+                id: assistantMessage.id,
                 role: "assistant",
-                content: `This is a mock response to: "${content}". I am a friendly AI assistant prototype!`,
-                createdAt: Date.now(),
+                content: assistantMessage.message,
+                createdAt: new Date(assistantMessage.createdAt).getTime(),
             };
 
             setChats((prev) =>
@@ -108,32 +170,48 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                         return {
                             ...chat,
                             messages: [...chat.messages, botMessage],
+                            title: name || chat.title, // Update title if changed
                         };
                     }
                     return chat;
                 })
             );
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            // Optionally, remove the user message or show error
+        } finally {
             setIsLoading(false);
-        }, 1500); // 1.5s delay
-    };
-
-    const deleteChat = (chatId: string) => {
-        setChats((prev) => {
-            const newChats = prev.filter((chat) => chat.id !== chatId);
-            return newChats;
-        });
-
-        if (activeChatId === chatId) {
-            setActiveChatId(null);
         }
     };
 
-    const renameChat = (chatId: string, newTitle: string) => {
-        setChats((prev) =>
-            prev.map((chat) =>
-                chat.id === chatId ? { ...chat, title: newTitle } : chat
-            )
-        );
+    const deleteChat = async (chatId: string) => {
+        try {
+            await api.delete(`/api/v1/chat/${chatId}`);
+            setChats((prev) => {
+                const newChats = prev.filter((chat) => chat.id !== chatId);
+                if (activeChatId === chatId) {
+                    setActiveChatId(newChats.length > 0 ? newChats[0].id : null);
+                }
+                return newChats;
+            });
+        } catch (error) {
+            console.error('Failed to delete chat:', error);
+        }
+    };
+
+    const renameChat = async (chatId: string, newTitle: string) => {
+        try {
+            await api.put(`/api/v1/chat/${chatId}/rename`, {
+                name: newTitle,
+            });
+            setChats((prev) =>
+                prev.map((chat) =>
+                    chat.id === chatId ? { ...chat, title: newTitle } : chat
+                )
+            );
+        } catch (error) {
+            console.error('Failed to rename chat:', error);
+        }
     };
 
     const value = {
