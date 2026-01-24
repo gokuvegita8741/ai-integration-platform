@@ -1,6 +1,7 @@
 "use client"
 
 import { Plus, Search, Sparkles, Diamond } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChat } from "./ChatContext"
@@ -104,8 +105,8 @@ export function ChatSidebar({ className, onSelect }: ChatSidebarProps) {
                         <p className="text-sm font-medium text-zinc-900 dark:text-white">2 Credits</p>
                         <p className="text-xs text-zinc-500">Free tier plan</p>
                     </div>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950">
-                        Buy
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950" asChild>
+                        <Link href="/pricing">Buy</Link>
                     </Button>
                 </div>
 
