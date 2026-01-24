@@ -108,3 +108,69 @@ async def process_chat_request(message: str, previous_messages: list[dict] = [])
         except Exception as e:
             print("[OpenRouter] UNEXPECTED ERROR", str(e))
             return "An unexpected error occurred."
+
+
+async def process_chat_request_stream(message: str, previous_messages: list[dict] = []):
+    """
+    Stream a TEXT-ONLY request to OpenRouter using Gemma 3.
+    Yields text chunks as they arrive.
+    """
+    print("[OpenRouter] ================================")
+    print("[OpenRouter] Starting STREAMING chat request")
+    print(f"[OpenRouter] Model: {MODEL}")
+    print("[OpenRouter] ================================")
+
+    headers = {
+        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    messages = [
+        {"role": "system", "content": "You are a helpful AI assistant. Use the previous conversation for context."}
+    ]
+    messages.extend(previous_messages)
+    messages.append({"role": "user", "content": message})
+
+    payload = {
+        "model": MODEL,
+        "messages": messages,
+        "stream": True,  # Enable streaming
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            async with client.stream(
+                "POST",
+                OPENROUTER_URL,
+                json=payload,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]  # Remove "data: " prefix
+                        if data_str.strip() == "[DONE]":
+                            break
+                        try:
+                            import json
+                            data = json.loads(data_str)
+                            if "choices" in data and data["choices"]:
+                                delta = data["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
+
+        except httpx.HTTPStatusError as e:
+            print("[OpenRouter] STREAM HTTP ERROR", e.response.status_code)
+            yield "The AI service is temporarily unavailable."
+
+        except httpx.RequestError as e:
+            print("[OpenRouter] STREAM NETWORK ERROR", str(e))
+            yield "Network error while contacting AI service."
+
+        except Exception as e:
+            print("[OpenRouter] STREAM UNEXPECTED ERROR", str(e))
+            yield "An unexpected error occurred."

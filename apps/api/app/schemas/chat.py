@@ -42,3 +42,16 @@ class ChatResponse(BaseModel):
     chatId: str
     message: ChatMessage
     name: Optional[str] = None # Include updated name if changed
+
+
+class ChatListItem(BaseModel):
+    id: str
+    name: str
+    createdAt: datetime
+
+
+class ChatDetailResponse(BaseModel):
+    id: str
+    name: str
+    createdAt: datetime
+    messages: List[ChatMessage]
