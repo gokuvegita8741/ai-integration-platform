@@ -46,13 +46,37 @@ model Chat {
 }
 
 model ChatMessage {
-  id        String   @id @default(uuid())
-  chatId    String
-  sender    MessageSender
-  message   String
-  createdAt DateTime @default(now())
+  id              String               @id @default(uuid())
+  chatId          String
+  sender          MessageSender
+  message         String               // Legacy fallback, new messages use versions
+  sequence        Int                  // 0,1,2,3… – stable position in chat
+  isActive        Boolean              @default(true)
+  activeVersionId String?              @unique
+  createdAt       DateTime             @default(now())
 
-  chat      Chat     @relation(fields: [chatId], references: [id])
+  chat            Chat                 @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  versions        ChatMessageVersion[]
+  activeVersion   ChatMessageVersion?  @relation("ActiveVersion", fields: [activeVersionId], references: [id])
+
+  @@index([chatId, sequence])
+  @@index([chatId, isActive])
+}
+
+model ChatMessageVersion {
+  id            String       @id @default(uuid())
+  messageId     String
+  versionNumber Int          // 1 = original, 2 = first regen, ...
+  content       String
+  createdAt     DateTime     @default(now())
+  model         String?      // e.g. "gemma-3-27b-it"
+  temperature   Float?
+
+  message       ChatMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  activeFor     ChatMessage? @relation("ActiveVersion")
+
+  @@unique([messageId, versionNumber])
+  @@index([messageId])
 }
 
 enum ChatSource {

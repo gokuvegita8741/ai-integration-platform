@@ -31,6 +31,17 @@ class MessageSender(str, Enum):
     user = "user"
     assistant = "assistant"
 
+
+# Version schema for individual message versions
+class ChatMessageVersion(BaseModel):
+    id: str
+    versionNumber: int
+    content: str
+    createdAt: datetime
+    model: Optional[str] = None
+
+
+# Legacy ChatMessage (for backward compatibility in some responses)
 class ChatMessage(BaseModel):
     id: str
     chatId: str
@@ -38,10 +49,41 @@ class ChatMessage(BaseModel):
     message: str
     createdAt: datetime
 
+
+# Enhanced ChatMessage with version support
+class ChatMessageWithVersions(BaseModel):
+    id: str
+    chatId: str
+    sender: MessageSender
+    sequence: int
+    isActive: bool
+    content: str  # Resolved from activeVersion or legacy message
+    versions: List[ChatMessageVersion] = []
+    activeVersionNumber: Optional[int] = None
+    totalVersions: int = 1
+    createdAt: datetime
+
+
+# Request schemas for regenerate feature
+class RegenerateRequest(BaseModel):
+    pass  # No body needed, messageId comes from path
+
+
+class SwitchVersionRequest(BaseModel):
+    versionNumber: int
+
+
 class ChatResponse(BaseModel):
     chatId: str
     message: ChatMessage
-    name: Optional[str] = None # Include updated name if changed
+    name: Optional[str] = None  # Include updated name if changed
+
+
+# Response for regenerate and switch endpoints
+class RegenerateResponse(BaseModel):
+    chatId: str
+    message: ChatMessageWithVersions
+    truncatedCount: int = 0  # Number of messages deactivated
 
 
 class ChatListItem(BaseModel):
@@ -54,4 +96,5 @@ class ChatDetailResponse(BaseModel):
     id: str
     name: str
     createdAt: datetime
-    messages: List[ChatMessage]
+    messages: List[ChatMessageWithVersions]
+

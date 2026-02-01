@@ -37,8 +37,12 @@ export default async function ChatPage({ params }: PageProps) {
         const initialMessages = chatDetail.messages.map((msg) => ({
             id: msg.id,
             role: msg.sender as "user" | "assistant",
-            content: msg.message,
+            content: msg.content, // Now using content from resolved activeVersion or legacy
             createdAt: new Date(msg.createdAt).getTime(),
+            sequence: msg.sequence,
+            versions: msg.versions,
+            activeVersionNumber: msg.activeVersionNumber,
+            totalVersions: msg.totalVersions,
         }));
 
         return (

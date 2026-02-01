@@ -10,18 +10,24 @@ import {
     Menu,
     PanelLeftClose,
     PanelLeftOpen,
+    RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { getStreamConfig } from "@/actions/chat";
+import { getStreamConfig, getRegenerateConfig, switchMessageVersion, ChatMessageVersion } from "@/actions/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { MessageVersionSelector } from "./MessageVersionSelector";
 
 interface Message {
     id: string;
     role: "user" | "assistant";
     content: string;
     createdAt: number;
+    sequence?: number;
+    versions?: ChatMessageVersion[];
+    activeVersionNumber?: number;
+    totalVersions?: number;
 }
 
 interface ChatMainProps {
@@ -47,6 +53,9 @@ export function ChatMain({
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState("");
+    const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
+    const [regeneratingContent, setRegeneratingContent] = useState("");
+    const [switchingVersionId, setSwitchingVersionId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = useCallback(() => {
@@ -55,12 +64,14 @@ export function ChatMain({
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, streamingContent, scrollToBottom]);
+    }, [messages, streamingContent, regeneratingContent, scrollToBottom]);
 
     // Reset messages when chat changes
     useEffect(() => {
         setMessages(initialMessages);
         setStreamingContent("");
+        setRegeneratingMessageId(null);
+        setRegeneratingContent("");
     }, [chatId, initialMessages]);
 
     const handleSend = async () => {
@@ -79,10 +90,8 @@ export function ChatMain({
         setStreamingContent("");
 
         try {
-            // Get stream config from server action
             const config = await getStreamConfig(chatId, userMessage.content);
 
-            // Initiate streaming from client
             const response = await fetch(config.url, {
                 method: "POST",
                 headers: {
@@ -122,25 +131,25 @@ export function ChatMain({
                                 fullContent += data.content;
                                 setStreamingContent(fullContent);
                             } else if (data.type === "done") {
-                                // Add final message
                                 const assistantMessage: Message = {
                                     id: data.messageId,
                                     role: "assistant",
                                     content: fullContent,
                                     createdAt: Date.now(),
+                                    totalVersions: 1,
+                                    activeVersionNumber: undefined,
                                 };
                                 setMessages((prev) => [...prev, assistantMessage]);
                                 setStreamingContent("");
                             }
                         } catch (e) {
-                            // Ignore parse errors for incomplete chunks
+                            // Ignore parse errors
                         }
                     }
                 }
             }
         } catch (error) {
             console.error("Streaming error:", error);
-            // Add error message
             const errorMessage: Message = {
                 id: `error-${Date.now()}`,
                 role: "assistant",
@@ -151,6 +160,123 @@ export function ChatMain({
             setStreamingContent("");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleRegenerate = async (messageId: string) => {
+        if (isLoading || regeneratingMessageId) return;
+
+        setRegeneratingMessageId(messageId);
+        setRegeneratingContent("");
+
+        try {
+            const config = await getRegenerateConfig(messageId);
+
+            const response = await fetch(config.url, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${config.token}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error("Regenerate request failed");
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) {
+                throw new Error("No reader available");
+            }
+
+            const decoder = new TextDecoder();
+            let fullContent = "";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split("\n");
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+
+                            if (data.type === "chunk") {
+                                fullContent += data.content;
+                                setRegeneratingContent(fullContent);
+                            } else if (data.type === "done") {
+                                const updatedMessage = data.message;
+                                const truncatedCount = data.truncatedCount || 0;
+
+                                // Update the message in state with new version info
+                                setMessages((prev) => {
+                                    let newMessages = prev.map((msg) => {
+                                        if (msg.id === messageId) {
+                                            return {
+                                                ...msg,
+                                                content: updatedMessage.content,
+                                                versions: updatedMessage.versions,
+                                                activeVersionNumber: updatedMessage.activeVersionNumber,
+                                                totalVersions: updatedMessage.totalVersions,
+                                            };
+                                        }
+                                        return msg;
+                                    });
+
+                                    // If messages were truncated, remove them from display
+                                    if (truncatedCount > 0) {
+                                        const targetIndex = newMessages.findIndex((m) => m.id === messageId);
+                                        if (targetIndex !== -1) {
+                                            newMessages = newMessages.slice(0, targetIndex + 1);
+                                        }
+                                    }
+
+                                    return newMessages;
+                                });
+
+                                setRegeneratingContent("");
+                                setRegeneratingMessageId(null);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Regenerate error:", error);
+            setRegeneratingContent("");
+            setRegeneratingMessageId(null);
+        }
+    };
+
+    const handleVersionSwitch = async (messageId: string, versionNumber: number) => {
+        if (switchingVersionId) return;
+
+        setSwitchingVersionId(messageId);
+
+        try {
+            const result = await switchMessageVersion(messageId, versionNumber);
+
+            setMessages((prev) =>
+                prev.map((msg) => {
+                    if (msg.id === messageId) {
+                        return {
+                            ...msg,
+                            content: result.message.content,
+                            activeVersionNumber: result.message.activeVersionNumber,
+                        };
+                    }
+                    return msg;
+                })
+            );
+        } catch (error) {
+            console.error("Version switch error:", error);
+        } finally {
+            setSwitchingVersionId(null);
         }
     };
 
@@ -245,42 +371,92 @@ export function ChatMain({
                 ) : (
                     // Message List
                     <div className="space-y-6 w-full">
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={cn(
-                                    "flex gap-4 w-full",
-                                    msg.role === "user" ? "justify-end" : "justify-start"
-                                )}
-                            >
-                                {msg.role === "assistant" && (
-                                    <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 mt-1">
-                                        <Bot className="w-5 h-5" />
-                                    </div>
-                                )}
+                        {messages.map((msg) => {
+                            const isRegenerating = regeneratingMessageId === msg.id;
+                            const isSwitchingVersion = switchingVersionId === msg.id;
 
+                            return (
                                 <div
+                                    key={msg.id}
                                     className={cn(
-                                        "max-w-[95%] sm:max-w-[75%] rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm",
-                                        msg.role === "user"
-                                            ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-tr-sm"
-                                            : "bg-white dark:bg-[#121214]  text-zinc-800 dark:text-zinc-200"
+                                        "flex gap-4 w-full group",
+                                        msg.role === "user" ? "justify-end" : "justify-start"
                                     )}
                                 >
-                                    {msg.role === "assistant" ? (
-                                        <MarkdownRenderer content={msg.content} />
-                                    ) : (
-                                        msg.content
+                                    {msg.role === "assistant" && (
+                                        <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 mt-1">
+                                            <Bot className="w-5 h-5" />
+                                        </div>
+                                    )}
+
+                                    <div className="flex flex-col max-w-[95%] sm:max-w-[75%]">
+                                        <div
+                                            className={cn(
+                                                "rounded-2xl px-5 py-3 text-sm leading-relaxed shadow-sm",
+                                                msg.role === "user"
+                                                    ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-tr-sm"
+                                                    : "bg-white dark:bg-[#121214] text-zinc-800 dark:text-zinc-200"
+                                            )}
+                                        >
+                                            {msg.role === "assistant" ? (
+                                                isRegenerating ? (
+                                                    <MarkdownRenderer content={regeneratingContent || "..."} />
+                                                ) : (
+                                                    <MarkdownRenderer content={msg.content} />
+                                                )
+                                            ) : (
+                                                msg.content
+                                            )}
+                                        </div>
+
+                                        {/* Regenerate button and Version selector for assistant messages */}
+                                        {msg.role === "assistant" && !isRegenerating && (
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {/* Regenerate button */}
+                                                <button
+                                                    onClick={() => handleRegenerate(msg.id)}
+                                                    disabled={isLoading || regeneratingMessageId !== null}
+                                                    className={cn(
+                                                        "p-1.5 rounded-full transition-all",
+                                                        "text-zinc-400 hover:text-indigo-500 dark:hover:text-indigo-400",
+                                                        "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                                        "opacity-0 group-hover:opacity-100",
+                                                        "disabled:opacity-30 disabled:cursor-not-allowed"
+                                                    )}
+                                                    title="Regenerate response"
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
+                                                </button>
+
+                                                {/* Version selector */}
+                                                {msg.totalVersions && msg.totalVersions > 1 && msg.activeVersionNumber && (
+                                                    <MessageVersionSelector
+                                                        currentVersion={msg.activeVersionNumber}
+                                                        totalVersions={msg.totalVersions}
+                                                        onVersionChange={(v) => handleVersionSwitch(msg.id, v)}
+                                                        isLoading={isSwitchingVersion}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Loading indicator during regeneration */}
+                                        {isRegenerating && !regeneratingContent && (
+                                            <div className="flex items-center gap-2 mt-2 text-zinc-400">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span className="text-xs">Regenerating...</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {msg.role === "user" && (
+                                        <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0 mt-1">
+                                            <User className="w-5 h-5" />
+                                        </div>
                                     )}
                                 </div>
-
-                                {msg.role === "user" && (
-                                    <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-500 shrink-0 mt-1">
-                                        <User className="w-5 h-5" />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
 
                         {/* Streaming Message */}
                         {streamingContent && (
@@ -360,7 +536,7 @@ export function ChatMain({
                                 onChange={(e) => setInputValue(e.target.value)}
                                 onKeyDown={handleKeyDown}
                                 placeholder="Type your prompt here..."
-                                disabled={isLoading}
+                                disabled={isLoading || regeneratingMessageId !== null}
                                 className="
                                     flex-1 h-11 bg-transparent outline-none border-0
                                     text-sm text-zinc-900 dark:text-white
@@ -373,7 +549,7 @@ export function ChatMain({
                             {/* Send button */}
                             <button
                                 onClick={handleSend}
-                                disabled={!inputValue.trim() || isLoading}
+                                disabled={!inputValue.trim() || isLoading || regeneratingMessageId !== null}
                                 className="
                                     flex items-center justify-center
                                     w-11 h-11 rounded-full
@@ -384,7 +560,7 @@ export function ChatMain({
                                     shrink-0
                                 "
                             >
-                                {isLoading ? (
+                                {isLoading || regeneratingMessageId ? (
                                     <Loader2 className="w-5 h-5 animate-spin" />
                                 ) : (
                                     <Send className="w-5 h-5" />

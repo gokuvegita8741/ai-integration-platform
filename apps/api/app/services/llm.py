@@ -164,7 +164,7 @@ async def process_chat_request_stream(message: str, previous_messages: list[dict
                             continue
 
         except httpx.HTTPStatusError as e:
-            print("[OpenRouter] STREAM HTTP ERROR", e.response.status_code)
+            print("[OpenRouter] STREAM HTTP ERROR", e.response.status_code,e)
             yield "The AI service is temporarily unavailable."
 
         except httpx.RequestError as e:

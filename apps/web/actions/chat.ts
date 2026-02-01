@@ -6,17 +6,31 @@ import { authOptions } from "@/lib/auth";
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 // Types
+
 export interface ChatListItem {
     id: string;
     name: string;
     createdAt: string;
 }
 
+export interface ChatMessageVersion {
+    id: string;
+    versionNumber: number;
+    content: string;
+    createdAt: string;
+    model?: string;
+}
+
 export interface ChatMessage {
     id: string;
     chatId: string;
     sender: "user" | "assistant";
-    message: string;
+    sequence: number;
+    isActive: boolean;
+    content: string; // Resolved from activeVersion or legacy
+    versions: ChatMessageVersion[];
+    activeVersionNumber?: number;
+    totalVersions: number;
     createdAt: string;
 }
 
@@ -44,7 +58,6 @@ async function getAuthHeaders() {
  */
 export async function createChat(): Promise<{ chatId: string; name: string }> {
     const headers = await getAuthHeaders();
-    console.log("HEADERS ->",headers)
 
     const response = await fetch(`${API_URL}/api/v1/chat/create`, {
         method: "POST",
@@ -144,7 +157,6 @@ export async function deleteChat(chatId: string): Promise<{ success: boolean }> 
 
 /**
  * Get stream URL and headers for client-side streaming
- * We return this because actual SSE streaming needs to happen client-side
  */
 export async function getStreamConfig(chatId: string, message: string) {
     const session = await getServerSession(authOptions);
@@ -157,4 +169,45 @@ export async function getStreamConfig(chatId: string, message: string) {
         token: session.accessToken,
         body: { chatId, message },
     };
+}
+
+/**
+ * Get regenerate stream config for client-side streaming regeneration
+ */
+export async function getRegenerateConfig(messageId: string) {
+    const session = await getServerSession(authOptions);
+    if (!session?.accessToken) {
+        throw new Error("Not authenticated");
+    }
+
+    return {
+        url: `${API_URL}/api/v1/chat/messages/${messageId}/regenerate`,
+        token: session.accessToken,
+    };
+}
+
+/**
+ * Switch to a different version of a message
+ */
+export async function switchMessageVersion(
+    messageId: string,
+    versionNumber: number
+): Promise<{ message: ChatMessage }> {
+    const headers = await getAuthHeaders();
+
+    const response = await fetch(
+        `${API_URL}/api/v1/chat/messages/${messageId}/switch-version`,
+        {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ versionNumber }),
+        }
+    );
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail || "Failed to switch version");
+    }
+
+    return response.json();
 }
