@@ -57,6 +57,7 @@ class ChatMessageWithVersions(BaseModel):
     sender: MessageSender
     sequence: int
     isActive: bool
+    parentVersionId: Optional[str] = None
     content: str  # Resolved from activeVersion or legacy message
     versions: List[ChatMessageVersion] = []
     activeVersionNumber: Optional[int] = None
@@ -83,6 +84,7 @@ class ChatResponse(BaseModel):
 class RegenerateResponse(BaseModel):
     chatId: str
     message: ChatMessageWithVersions
+    messages: List[ChatMessageWithVersions] = []
     truncatedCount: int = 0  # Number of messages deactivated
 
 
@@ -97,4 +99,3 @@ class ChatDetailResponse(BaseModel):
     name: str
     createdAt: datetime
     messages: List[ChatMessageWithVersions]
-

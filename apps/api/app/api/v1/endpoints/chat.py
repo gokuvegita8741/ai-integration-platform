@@ -71,12 +71,109 @@ def build_message_with_versions(msg: models.ChatMessage) -> ChatMessageWithVersi
         sender=msg.sender,
         sequence=msg.sequence,
         isActive=msg.isActive,
+        parentVersionId=getattr(msg, 'parentVersionId', None),
         content=resolve_message_content(msg),
         versions=versions,
         activeVersionNumber=active_version_number,
         totalVersions=len(versions) if versions else 1,
         createdAt=msg.createdAt
     )
+
+
+async def ensure_assistant_version(msg: models.ChatMessage) -> str:
+    """Ensure an assistant message has an active version row and return its active version id."""
+    if msg.sender != "assistant":
+        raise ValueError("Only assistant messages can have response versions")
+
+    if msg.activeVersionId:
+        return msg.activeVersionId
+
+    versions = getattr(msg, 'versions', None) or []
+    if versions:
+        first_version = sorted(versions, key=lambda v: v.versionNumber)[0]
+        await prisma.chatmessage.update(
+            where={'id': msg.id},
+            data={'activeVersionId': first_version.id, 'message': first_version.content}
+        )
+        return first_version.id
+
+    version = await prisma.chatmessageversion.create(
+        data={
+            'messageId': msg.id,
+            'versionNumber': 1,
+            'content': msg.message,
+            'model': None
+        }
+    )
+    await prisma.chatmessage.update(
+        where={'id': msg.id},
+        data={'activeVersionId': version.id}
+    )
+    return version.id
+
+
+async def get_current_parent_version_id(chat_id: str) -> Optional[str]:
+    """Return the active assistant version that new messages should branch from."""
+    last_assistant = await prisma.chatmessage.find_first(
+        where={'chatId': chat_id, 'sender': 'assistant', 'isActive': True},
+        order={'sequence': 'desc'},
+        include={
+            'versions': {'order_by': {'versionNumber': 'asc'}},
+            'activeVersion': True
+        }
+    )
+    if not last_assistant:
+        return None
+    return await ensure_assistant_version(last_assistant)
+
+
+async def rebuild_active_conversation(chat_id: str) -> list[ChatMessageWithVersions]:
+    """
+    Recompute the visible conversation path from selected assistant versions.
+    Messages whose parent assistant version is not on the selected path are hidden.
+    """
+    messages_db = await prisma.chatmessage.find_many(
+        where={'chatId': chat_id},
+        order={'sequence': 'asc'},
+        include={
+            'versions': {'order_by': {'versionNumber': 'asc'}},
+            'activeVersion': True
+        }
+    )
+
+    visible_version_ids = set()
+    visible_message_ids = []
+
+    for msg in messages_db:
+        parent_version_id = getattr(msg, 'parentVersionId', None)
+        is_visible = parent_version_id is None or parent_version_id in visible_version_ids
+
+        if is_visible:
+            visible_message_ids.append(msg.id)
+            if msg.sender == "assistant":
+                visible_version_ids.add(await ensure_assistant_version(msg))
+
+    await prisma.chatmessage.update_many(
+        where={'chatId': chat_id},
+        data={'isActive': False}
+    )
+
+    if visible_message_ids:
+        await prisma.chatmessage.update_many(
+            where={'id': {'in': visible_message_ids}},
+            data={'isActive': True}
+        )
+
+    active_messages = await prisma.chatmessage.find_many(
+        where={'chatId': chat_id, 'isActive': True},
+        order={'sequence': 'asc'},
+        include={
+            'versions': {'order_by': {'versionNumber': 'asc'}},
+            'activeVersion': True
+        }
+    )
+
+    return [build_message_with_versions(msg) for msg in active_messages]
 
 
 async def get_chat_context(chat_id: str, up_to_sequence: Optional[int] = None, limit: int = 10) -> list[dict]:
@@ -266,6 +363,7 @@ async def send_chat_message(
 
     # Get next sequence
     next_seq = await get_next_sequence(chat_id)
+    parent_version_id = await get_current_parent_version_id(chat_id)
     
     # Save User Message
     await prisma.chatmessage.create(
@@ -274,7 +372,8 @@ async def send_chat_message(
             'sender': MessageSender.user,
             'message': chat_in.message,
             'sequence': next_seq,
-            'isActive': True
+            'isActive': True,
+            'parentVersionId': parent_version_id
         }
     )
     
@@ -292,8 +391,21 @@ async def send_chat_message(
             'sender': MessageSender.assistant,
             'message': assistant_reply,
             'sequence': assistant_seq,
-            'isActive': True
+            'isActive': True,
+            'parentVersionId': parent_version_id
         }
+    )
+    assistant_version = await prisma.chatmessageversion.create(
+        data={
+            'messageId': assistant_msg.id,
+            'versionNumber': 1,
+            'content': assistant_reply,
+            'model': None
+        }
+    )
+    assistant_msg = await prisma.chatmessage.update(
+        where={'id': assistant_msg.id},
+        data={'activeVersionId': assistant_version.id}
     )
     
     return ChatResponse(
@@ -339,6 +451,7 @@ async def stream_chat_message(
 
     # Get next sequence
     next_seq = await get_next_sequence(chat_id)
+    parent_version_id = await get_current_parent_version_id(chat_id)
     
     # Save User Message
     user_msg = await prisma.chatmessage.create(
@@ -347,7 +460,8 @@ async def stream_chat_message(
             'sender': MessageSender.user,
             'message': chat_in.message,
             'sequence': next_seq,
-            'isActive': True
+            'isActive': True,
+            'parentVersionId': parent_version_id
         }
     )
     
@@ -374,8 +488,21 @@ async def stream_chat_message(
                 'sender': MessageSender.assistant,
                 'message': complete_message,
                 'sequence': assistant_seq,
-                'isActive': True
+                'isActive': True,
+                'parentVersionId': parent_version_id
             }
+        )
+        assistant_version = await prisma.chatmessageversion.create(
+            data={
+                'messageId': assistant_msg.id,
+                'versionNumber': 1,
+                'content': complete_message,
+                'model': None
+            }
+        )
+        assistant_msg = await prisma.chatmessage.update(
+            where={'id': assistant_msg.id},
+            data={'activeVersionId': assistant_version.id}
         )
         
         yield f"data: {{\"type\": \"done\", \"messageId\": \"{assistant_msg.id}\"}}\n\n"
@@ -493,6 +620,8 @@ async def regenerate_message(
             data={'activeVersionId': new_version.id, 'message': complete_content}
         )
         
+        messages = await rebuild_active_conversation(chat_id)
+
         # Get updated message with all versions
         updated_msg = await prisma.chatmessage.find_unique(
             where={'id': message_id},
@@ -504,7 +633,8 @@ async def regenerate_message(
         
         import json
         msg_data = build_message_with_versions(updated_msg)
-        yield f"data: {{\"type\": \"done\", \"message\": {json.dumps(msg_data.model_dump(), default=str)}, \"truncatedCount\": {truncated_count}}}\n\n"
+        messages_data = [m.model_dump() for m in messages]
+        yield f"data: {{\"type\": \"done\", \"message\": {json.dumps(msg_data.model_dump(), default=str)}, \"messages\": {json.dumps(messages_data, default=str)}, \"truncatedCount\": {truncated_count}}}\n\n"
     
     return StreamingResponse(
         event_generator(),
@@ -524,7 +654,7 @@ async def switch_message_version(
 ) -> RegenerateResponse:
     """
     Switch to a different version of an assistant message.
-    This does NOT re-activate any deactivated messages.
+    Rebuilds the active conversation path for the selected branch.
     """
     # 1. Get message with chat
     message = await prisma.chatmessage.find_unique(
@@ -556,6 +686,8 @@ async def switch_message_version(
         where={'id': message_id},
         data={'activeVersionId': target_version.id}
     )
+
+    messages = await rebuild_active_conversation(message.chatId)
     
     # 4. Fetch updated message
     updated_msg = await prisma.chatmessage.find_unique(
@@ -569,5 +701,6 @@ async def switch_message_version(
     return RegenerateResponse(
         chatId=message.chatId,
         message=build_message_with_versions(updated_msg),
+        messages=messages,
         truncatedCount=0
     )

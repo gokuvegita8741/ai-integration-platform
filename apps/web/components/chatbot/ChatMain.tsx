@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { getStreamConfig, getRegenerateConfig, switchMessageVersion, ChatMessageVersion } from "@/actions/chat";
+import { getStreamConfig, getRegenerateConfig, switchMessageVersion, ChatMessage as ApiChatMessage, ChatMessageVersion } from "@/actions/chat";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { MessageVersionSelector } from "./MessageVersionSelector";
 
@@ -57,6 +57,17 @@ export function ChatMain({
     const [regeneratingContent, setRegeneratingContent] = useState("");
     const [switchingVersionId, setSwitchingVersionId] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const mapApiMessage = useCallback((msg: ApiChatMessage): Message => ({
+        id: msg.id,
+        role: msg.sender,
+        content: msg.content,
+        createdAt: new Date(msg.createdAt).getTime(),
+        sequence: msg.sequence,
+        versions: msg.versions,
+        activeVersionNumber: msg.activeVersionNumber,
+        totalVersions: msg.totalVersions,
+    }), []);
 
     const scrollToBottom = useCallback(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -166,6 +177,11 @@ export function ChatMain({
     const handleRegenerate = async (messageId: string) => {
         if (isLoading || regeneratingMessageId) return;
 
+        const previousMessages = messages;
+        setMessages((prev) => {
+            const targetIndex = prev.findIndex((msg) => msg.id === messageId);
+            return targetIndex === -1 ? prev : prev.slice(0, targetIndex + 1);
+        });
         setRegeneratingMessageId(messageId);
         setRegeneratingContent("");
 
@@ -211,31 +227,34 @@ export function ChatMain({
                                 const updatedMessage = data.message;
                                 const truncatedCount = data.truncatedCount || 0;
 
-                                // Update the message in state with new version info
-                                setMessages((prev) => {
-                                    let newMessages = prev.map((msg) => {
-                                        if (msg.id === messageId) {
-                                            return {
-                                                ...msg,
-                                                content: updatedMessage.content,
-                                                versions: updatedMessage.versions,
-                                                activeVersionNumber: updatedMessage.activeVersionNumber,
-                                                totalVersions: updatedMessage.totalVersions,
-                                            };
+                                if (data.messages) {
+                                    setMessages(data.messages.map(mapApiMessage));
+                                } else {
+                                    // Fallback for older API responses.
+                                    setMessages((prev) => {
+                                        let newMessages = prev.map((msg) => {
+                                            if (msg.id === messageId) {
+                                                return {
+                                                    ...msg,
+                                                    content: updatedMessage.content,
+                                                    versions: updatedMessage.versions,
+                                                    activeVersionNumber: updatedMessage.activeVersionNumber,
+                                                    totalVersions: updatedMessage.totalVersions,
+                                                };
+                                            }
+                                            return msg;
+                                        });
+
+                                        if (truncatedCount > 0) {
+                                            const targetIndex = newMessages.findIndex((m) => m.id === messageId);
+                                            if (targetIndex !== -1) {
+                                                newMessages = newMessages.slice(0, targetIndex + 1);
+                                            }
                                         }
-                                        return msg;
+
+                                        return newMessages;
                                     });
-
-                                    // If messages were truncated, remove them from display
-                                    if (truncatedCount > 0) {
-                                        const targetIndex = newMessages.findIndex((m) => m.id === messageId);
-                                        if (targetIndex !== -1) {
-                                            newMessages = newMessages.slice(0, targetIndex + 1);
-                                        }
-                                    }
-
-                                    return newMessages;
-                                });
+                                }
 
                                 setRegeneratingContent("");
                                 setRegeneratingMessageId(null);
@@ -248,6 +267,7 @@ export function ChatMain({
             }
         } catch (error) {
             console.error("Regenerate error:", error);
+            setMessages(previousMessages);
             setRegeneratingContent("");
             setRegeneratingMessageId(null);
         }
@@ -261,18 +281,22 @@ export function ChatMain({
         try {
             const result = await switchMessageVersion(messageId, versionNumber);
 
-            setMessages((prev) =>
-                prev.map((msg) => {
-                    if (msg.id === messageId) {
-                        return {
-                            ...msg,
-                            content: result.message.content,
-                            activeVersionNumber: result.message.activeVersionNumber,
-                        };
-                    }
-                    return msg;
-                })
-            );
+            if (result.messages) {
+                setMessages(result.messages.map(mapApiMessage));
+            } else {
+                setMessages((prev) =>
+                    prev.map((msg) => {
+                        if (msg.id === messageId) {
+                            return {
+                                ...msg,
+                                content: result.message.content,
+                                activeVersionNumber: result.message.activeVersionNumber,
+                            };
+                        }
+                        return msg;
+                    })
+                );
+            }
         } catch (error) {
             console.error("Version switch error:", error);
         } finally {

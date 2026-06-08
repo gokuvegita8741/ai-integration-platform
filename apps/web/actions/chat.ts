@@ -27,6 +27,7 @@ export interface ChatMessage {
     sender: "user" | "assistant";
     sequence: number;
     isActive: boolean;
+    parentVersionId?: string | null;
     content: string; // Resolved from activeVersion or legacy
     versions: ChatMessageVersion[];
     activeVersionNumber?: number;
@@ -192,7 +193,7 @@ export async function getRegenerateConfig(messageId: string) {
 export async function switchMessageVersion(
     messageId: string,
     versionNumber: number
-): Promise<{ message: ChatMessage }> {
+): Promise<{ message: ChatMessage; messages: ChatMessage[] }> {
     const headers = await getAuthHeaders();
 
     const response = await fetch(

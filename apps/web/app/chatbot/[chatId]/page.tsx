@@ -40,6 +40,7 @@ export default async function ChatPage({ params }: PageProps) {
             content: msg.content, // Now using content from resolved activeVersion or legacy
             createdAt: new Date(msg.createdAt).getTime(),
             sequence: msg.sequence,
+            parentVersionId: msg.parentVersionId,
             versions: msg.versions,
             activeVersionNumber: msg.activeVersionNumber,
             totalVersions: msg.totalVersions,

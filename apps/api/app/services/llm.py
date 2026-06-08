@@ -3,7 +3,7 @@ from typing import Any, Optional
 from app.core.config import settings
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemma-3-27b-it:free"
+MODEL = settings.OPENROUTER_MODEL
 
 
 def extract_text_from_content(content: Any) -> str:
@@ -21,7 +21,7 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-async def process_chat_request(message: str, previous_messages: list[dict] = []) -> str:
+async def process_chat_request(message: str, previous_messages: Optional[list[dict]] = None) -> str:
     """
     Send a TEXT-ONLY request to OpenRouter using Gemma 3 with context.
     previous_messages: list of dicts with 'role' and 'content' keys.
@@ -30,7 +30,7 @@ async def process_chat_request(message: str, previous_messages: list[dict] = [])
     print("[OpenRouter] ================================")
     print("[OpenRouter] Starting chat request")
     print(f"[OpenRouter] Model: {MODEL}")
-    print(f"[OpenRouter] Context length: {len(previous_messages)}")
+    print(f"[OpenRouter] Context length: {len(previous_messages or [])}")
     print("[OpenRouter] ================================")
 
     headers = {
@@ -47,7 +47,7 @@ async def process_chat_request(message: str, previous_messages: list[dict] = [])
     ]
     
     # Add context
-    messages.extend(previous_messages)
+    messages.extend(previous_messages or [])
     
     # Add current message
     messages.append({"role": "user", "content": message})
@@ -110,7 +110,7 @@ async def process_chat_request(message: str, previous_messages: list[dict] = [])
             return "An unexpected error occurred."
 
 
-async def process_chat_request_stream(message: str, previous_messages: list[dict] = []):
+async def process_chat_request_stream(message: str, previous_messages: Optional[list[dict]] = None):
     """
     Stream a TEXT-ONLY request to OpenRouter using Gemma 3.
     Yields text chunks as they arrive.
@@ -128,7 +128,7 @@ async def process_chat_request_stream(message: str, previous_messages: list[dict
     messages = [
         {"role": "system", "content": "You are a helpful AI assistant. Use the previous conversation for context."}
     ]
-    messages.extend(previous_messages)
+    messages.extend(previous_messages or [])
     messages.append({"role": "user", "content": message})
 
     payload = {
@@ -164,7 +164,11 @@ async def process_chat_request_stream(message: str, previous_messages: list[dict
                             continue
 
         except httpx.HTTPStatusError as e:
-            print("[OpenRouter] STREAM HTTP ERROR", e.response.status_code,e)
+            print(
+                "[OpenRouter] STREAM HTTP ERROR",
+                e.response.status_code,
+                e.response.text[:500],
+            )
             yield "The AI service is temporarily unavailable."
 
         except httpx.RequestError as e:

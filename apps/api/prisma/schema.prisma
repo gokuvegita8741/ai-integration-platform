@@ -53,14 +53,17 @@ model ChatMessage {
   sequence        Int                  // 0,1,2,3… – stable position in chat
   isActive        Boolean              @default(true)
   activeVersionId String?              @unique
+  parentVersionId String?
   createdAt       DateTime             @default(now())
 
   chat            Chat                 @relation(fields: [chatId], references: [id], onDelete: Cascade)
   versions        ChatMessageVersion[]
   activeVersion   ChatMessageVersion?  @relation("ActiveVersion", fields: [activeVersionId], references: [id])
+  parentVersion   ChatMessageVersion?  @relation("BranchParent", fields: [parentVersionId], references: [id])
 
   @@index([chatId, sequence])
   @@index([chatId, isActive])
+  @@index([parentVersionId])
 }
 
 model ChatMessageVersion {
@@ -74,6 +77,7 @@ model ChatMessageVersion {
 
   message       ChatMessage  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   activeFor     ChatMessage? @relation("ActiveVersion")
+  branchMessages ChatMessage[] @relation("BranchParent")
 
   @@unique([messageId, versionNumber])
   @@index([messageId])

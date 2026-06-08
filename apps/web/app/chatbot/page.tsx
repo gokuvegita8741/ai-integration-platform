@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { ChatLayout } from "@/components/chatbot/ChatLayout";
-import { getChats } from "@/actions/chat";
+import { getChats, ChatListItem } from "@/actions/chat";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,7 +18,7 @@ export default async function ChatbotPage() {
     }
 
     // Fetch initial chats for the sidebar
-    let chats = [];
+    let chats: ChatListItem[] = [];
     try {
         chats = await getChats();
     } catch (error) {
