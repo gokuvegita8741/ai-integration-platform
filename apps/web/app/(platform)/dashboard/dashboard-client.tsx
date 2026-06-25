@@ -21,6 +21,10 @@ export function DashboardClient({ userName, dashboardData }: DashboardClientProp
         totalAgents: 0,
     };
 
+    if(!dashboardData){
+        return <div className="text-white">Loading.....</div>
+    }
+
     return (
         <div className="space-y-8">
             {/* Greeting */}
