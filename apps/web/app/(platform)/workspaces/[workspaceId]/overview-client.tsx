@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { WorkspaceWithStats } from "@/actions/workspace";
 import type { ActivityItem } from "@/actions/activity";
+import { ACTION_LABELS } from "@/lib/activity-format";
 
 interface WorkspaceOverviewClientProps {
     workspace: WorkspaceWithStats;
@@ -148,7 +149,7 @@ export function WorkspaceOverviewClient({
                                 <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm text-zinc-300 truncate">
-                                        {item.description}
+                                        {ACTION_LABELS[item.action]}
                                     </p>
                                     <p className="text-[10px] text-zinc-600 mt-0.5">
                                         {formatRelativeTime(item.createdAt)}

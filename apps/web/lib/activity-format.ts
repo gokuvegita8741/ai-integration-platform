@@ -1,6 +1,6 @@
 import type { ActivityItem } from "@/actions/activity";
 
-const ACTION_LABELS: Record<string, string> = {
+export const ACTION_LABELS: Record<string, string> = {
     chat_created: "Created chat",
     chat_deleted: "Deleted chat",
     workspace_created: "Created workspace",
