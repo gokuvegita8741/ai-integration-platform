@@ -54,8 +54,6 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                 color: selectedColor,
             });
 
-            console.log("Workspace created:", JSON.stringify(workspace));
-
             notifications.show({
                 title: "Workspace created",
                 message: `"${workspace.name}" is ready to use`,
@@ -86,7 +84,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
 
     return (
         <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
-            <DialogContent className="sm:max-w-[480px] bg-zinc-900/95 backdrop-blur-2xl border-white/[0.08]">
+            <DialogContent className="sm:max-w-120 bg-zinc-900/95 backdrop-blur-2xl border-white/8">
                 <DialogHeader>
                     <DialogTitle className="text-zinc-100">Create Workspace</DialogTitle>
                     <DialogDescription>
@@ -104,7 +102,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="My AI Project"
-                            className="bg-white/[0.04] border-white/[0.08] focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/10"
+                            className="bg-white/4 border-white/8 focus-visible:border-indigo-500/50 focus-visible:ring-indigo-500/10"
                         />
                     </div>
 
@@ -118,7 +116,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                             onChange={(e) => setDescription(e.target.value)}
                             placeholder="Describe what this workspace is for..."
                             rows={3}
-                            className="w-full rounded-md bg-white/[0.04] border border-white/[0.08] px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 outline-none resize-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                            className="w-full rounded-md bg-white/4 border border-white/8 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 outline-none resize-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/10 transition-all"
                         />
                     </div>
 
@@ -133,8 +131,8 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                                     className={cn(
                                         "w-9 h-9 rounded-lg flex items-center justify-center text-base transition-all",
                                         selectedIcon === icon
-                                            ? "bg-white/[0.1] ring-2 ring-indigo-500/50 scale-110"
-                                            : "bg-white/[0.03] hover:bg-white/[0.06]"
+                                            ? "bg-white/10 ring-2 ring-indigo-500/50 scale-110"
+                                            : "bg-white/3 hover:bg-white/6"
                                     )}
                                 >
                                     {icon}
@@ -149,6 +147,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                         <div className="flex gap-2 flex-wrap">
                             {presetColors.map((color) => (
                                 <button
+                                    aria-label={`Select ${color} accent color`}
                                     key={color}
                                     onClick={() => setSelectedColor(color)}
                                     className={cn(
@@ -159,7 +158,10 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                                     )}
                                     style={{
                                         backgroundColor: color,
-                                        ringColor: color,
+                                        boxShadow:
+                                            selectedColor === color
+                                                ? `0 0 0 2px ${color}, 0 0 0 4px rgb(24 24 27)`
+                                                : undefined,
                                     }}
                                 />
                             ))}
@@ -178,7 +180,7 @@ export function CreateWorkspaceDialog({ open, onOpenChange }: CreateWorkspaceDia
                     <Button
                         onClick={handleCreate}
                         disabled={!name.trim() || loading}
-                        className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-0"
+                        className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-0"
                     >
                         {loading ? (
                             <>

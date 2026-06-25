@@ -53,6 +53,5 @@ export async function getDashboardData(): Promise<DashboardData> {
     }
 
     const res = await response.json();
-    console.log("Dashboard Data: " + JSON.stringify(res, null, 2));
     return res;
 }
