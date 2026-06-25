@@ -54,7 +54,7 @@ export default function Register({ onToggle }: { onToggle: () => void }) {
           await signIn("credentials", {
             email: data.email,
             password: data.password,
-            callbackUrl: "/chatbot",
+            callbackUrl: "/dashboard",
           });
         } else {
           throw new Error("Registration failed");

@@ -16,6 +16,10 @@ export default async function PlatformLayout({
         redirect("/auth/login");
     }
 
+    if (Date.now() > session.accessTokenExpires) {
+        redirect("/auth/logout");
+    }
+
     let workspaces: Workspace[] = [];
     try {
         workspaces = await getWorkspaces();

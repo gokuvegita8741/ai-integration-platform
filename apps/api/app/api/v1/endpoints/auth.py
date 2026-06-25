@@ -1,5 +1,5 @@
 from typing import Annotated
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.security import create_access_token
 from app.core.config import settings
@@ -26,10 +26,18 @@ async def login(login_data: UserLogin):
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire_at = datetime.now(timezone.utc) + access_token_expires
     access_token = create_access_token(
         data={"sub": user.id}, expires_delta=access_token_expires
     )
-    return LoginResponse(access_token=access_token, token_type="bearer", email=user.email, fullName=user.fullName, userId=user.id)
+    return LoginResponse(
+        access_token=access_token, 
+        token_type="bearer", 
+        email=user.email, 
+        fullName=user.fullName, 
+        userId=user.id,  
+        expiresAt=int(expire_at.timestamp() * 1000) # milliseconds
+    )
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user: Annotated[User, Depends(deps.get_current_user)]):

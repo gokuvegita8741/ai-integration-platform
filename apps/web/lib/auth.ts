@@ -27,7 +27,10 @@ export const authOptions: NextAuthOptions = {
                         id: data.userId,
                         email: data.email,
                         name: data.fullName,
+
+                        // Access Token Details
                         accessToken: data.access_token,
+                        accessTokenExpires: data.expiresAt,
                     };
                 } catch (error: any) {
                     console.error("Auth error:", error);
@@ -43,18 +46,24 @@ export const authOptions: NextAuthOptions = {
     callbacks: {
         async jwt({ token, user }) {
             if (user) {
-                token.email = (user as any).email;
-                token.name = (user as any).name;
-                token.accessToken = (user as any).accessToken;
-                token.id = (user as any).id;
+                console.log("user -> ", user)
+                token.email = user.email;
+                token.name = user.name;
+                token.accessToken = user.accessToken;
+                token.accessTokenExpires =
+                    (user as any).accessTokenExpires;
+                token.id = user.id;
             }
             return token;
         },
         async session({ session, token }) {
             session.accessToken = token.accessToken as string;
+            session.accessTokenExpires =
+                token.accessTokenExpires as number;
             session.user.id = token.id as string;
             session.user.email = token.email as string;
             session.user.name = token.name as string;
+
             return session;
         },
     },

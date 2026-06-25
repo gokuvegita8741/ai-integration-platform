@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import Any, List, Optional
+import json
 from app.db import prisma
 from app.api import deps
 from app.schemas.chat import (
@@ -554,8 +555,11 @@ async def stream_chat_message(
         
         async for chunk in process_chat_request_stream(chat_in.message, previous_messages):
             full_response.append(chunk)
-            escaped_chunk = chunk.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
-            yield f"data: {{\"type\": \"chunk\", \"content\": \"{escaped_chunk}\"}}\n\n"
+            payload = {
+                "type":"chunk",
+                "content":chunk
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
         
         # Save complete response
         complete_message = "".join(full_response)

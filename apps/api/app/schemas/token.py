@@ -14,3 +14,4 @@ class LoginResponse(BaseModel):
     userId: str
     email: str
     fullName: str | None = None
+    expiresAt: int
