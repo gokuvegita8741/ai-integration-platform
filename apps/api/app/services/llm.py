@@ -6,6 +6,11 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = settings.OPENROUTER_MODEL
 
 
+def _decode_error_body(content: bytes) -> str:
+    """Return a short, log-safe preview of an HTTP error body."""
+    return content.decode("utf-8", errors="replace")[:500]
+
+
 def extract_text_from_content(content: Any) -> str:
     """
     Extract plain text from OpenRouter response.
@@ -145,7 +150,15 @@ async def process_chat_request_stream(message: str, previous_messages: Optional[
                 json=payload,
                 headers=headers,
             ) as response:
-                response.raise_for_status()
+                if response.is_error:
+                    error_body = await response.aread()
+                    print(
+                        "[OpenRouter] STREAM HTTP ERROR",
+                        response.status_code,
+                        _decode_error_body(error_body),
+                    )
+                    yield "The AI service is temporarily unavailable."
+                    return
                 
                 async for line in response.aiter_lines():
                     if line.startswith("data: "):
@@ -164,10 +177,11 @@ async def process_chat_request_stream(message: str, previous_messages: Optional[
                             continue
 
         except httpx.HTTPStatusError as e:
+            error_body = await e.response.aread()
             print(
                 "[OpenRouter] STREAM HTTP ERROR",
                 e.response.status_code,
-                e.response.text[:500],
+                _decode_error_body(error_body),
             )
             yield "The AI service is temporarily unavailable."
 

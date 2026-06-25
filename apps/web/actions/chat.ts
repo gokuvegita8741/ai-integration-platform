@@ -57,10 +57,16 @@ async function getAuthHeaders() {
 /**
  * Create a new chat
  */
-export async function createChat(): Promise<{ chatId: string; name: string }> {
+export async function createChat(workspaceId?: string): Promise<{ chatId: string; name: string }> {
     const headers = await getAuthHeaders();
 
-    const response = await fetch(`${API_URL}/api/v1/chat/create`, {
+    const params = new URLSearchParams();
+
+    if(workspaceId){
+        params.append("workspace_id",workspaceId);
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/chat/create?${params.toString()}`, {
         method: "POST",
         headers,
         body: JSON.stringify({ source: "standalone" }),
@@ -77,10 +83,16 @@ export async function createChat(): Promise<{ chatId: string; name: string }> {
 /**
  * Get list of user's chats
  */
-export async function getChats(): Promise<ChatListItem[]> {
+export async function getChats(workspaceId?: string): Promise<ChatListItem[]> {
     const headers = await getAuthHeaders();
 
-    const response = await fetch(`${API_URL}/api/v1/chat/list`, {
+    const params = new URLSearchParams();
+
+    if (workspaceId) {
+        params.append("workspace_id", workspaceId);
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/chat/list?${params.toString()}`, {
         method: "GET",
         headers,
         cache: "no-store",
@@ -88,10 +100,10 @@ export async function getChats(): Promise<ChatListItem[]> {
 
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || "Failed to fetch chats");
+        throw new Error(error || "Failed to fetch chats");
     }
-
-    return response.json();
+    const res = await response.json();
+    return res;
 }
 
 /**

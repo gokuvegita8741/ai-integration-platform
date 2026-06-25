@@ -13,7 +13,7 @@ export function ThemeToggle() {
             <Button
                 variant="ghost"
                 size="icon"
-                className="w-full justify-start px-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="w-full text-foreground justify-start px-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             >
                 <div className="flex items-center gap-3">

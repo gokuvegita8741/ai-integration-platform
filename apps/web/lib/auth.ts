@@ -22,6 +22,8 @@ export const authOptions: NextAuthOptions = {
                         password: credentials.password,
                     });
 
+                    console.log("Login response -> ", data);
+
                     // Return user object
                     return {
                         id: data.userId,

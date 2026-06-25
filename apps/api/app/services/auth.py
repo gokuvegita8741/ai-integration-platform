@@ -47,5 +47,23 @@ class AuthService:
                     "userId": user.id
                 }
             )
+
+            # Auto-create Personal Workspace
+            workspace = await tx.workspace.create(
+                data={
+                    "name": "Personal Workspace",
+                    "description": "Your default workspace",
+                    "icon": "home",
+                    "color": "#6366f1",
+                    "userId": user.id,
+                }
+            )
+            await tx.workspacemember.create(
+                data={
+                    "userId": user.id,
+                    "workspaceId": workspace.id,
+                    "role": "owner",
+                }
+            )
             
         return user

@@ -18,6 +18,7 @@ interface ChatLayoutProps {
         createdAt: number;
     }>;
     initialChatName?: string;
+    workspaceId?: string;
 }
 
 export function ChatLayout({
@@ -25,6 +26,7 @@ export function ChatLayout({
     activeChatId = null,
     initialMessages = [],
     initialChatName = "New Chat",
+    workspaceId
 }: ChatLayoutProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -40,14 +42,18 @@ export function ChatLayout({
     // Handle creating a new chat
     const handleCreateChat = async () => {
         try {
-            const result = await createChat();
+            const result = workspaceId ? await createChat(workspaceId) : await createChat();
             // Add to local state
             setChats((prev) => [
                 { id: result.chatId, name: result.name, createdAt: new Date().toISOString() },
                 ...prev,
             ]);
             // Navigate to new chat
-            router.push(`/chatbot/${result.chatId}`);
+            if(workspaceId){
+                router.push(`/workspaces/${workspaceId}/chat/${result.chatId}`)
+            }else{
+                router.push(`/chatbot/${result.chatId}`);
+            }
         } catch (error) {
             console.error("Failed to create chat:", error);
         }
@@ -56,7 +62,11 @@ export function ChatLayout({
     // Handle selecting a chat
     const handleSelectChat = (chatId: string) => {
         setIsMobileMenuOpen(false);
-        router.push(`/chatbot/${chatId}`);
+        if(workspaceId){
+            router.push(`/workspaces/${workspaceId}/chat/${chatId}`);
+        }else{
+            router.push(`/chatbot/${chatId}`);
+        }
     };
 
     // Handle renaming a chat
@@ -81,7 +91,11 @@ export function ChatLayout({
             setChats((prev) => prev.filter((chat) => chat.id !== chatId));
             // If deleted the active chat, navigate to base
             if (chatId === activeChatId) {
-                router.push("/chatbot");
+                if(workspaceId){
+                    router.push(`/workspaces/${workspaceId}/chat/${chatId}`)
+                }else{
+                    router.push("/chatbot");
+                }
             }
         } catch (error) {
             console.error("Failed to delete chat:", error);

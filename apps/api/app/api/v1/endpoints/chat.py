@@ -19,6 +19,7 @@ from app.schemas.chat import (
     RegenerateResponse
 )
 from app.services.llm import process_chat_request, process_chat_request_stream
+from app.services.activity import ActivityService
 from prisma import models
 
 router = APIRouter()
@@ -209,27 +210,41 @@ async def get_chat_context(chat_id: str, up_to_sequence: Optional[int] = None, l
 @router.post("/create", response_model=ChatCreateResponse)
 async def create_chat(
     chat_in: ChatCreateRequest,
+    workspace_id: Optional[str] = None,
     current_user: models.User = Depends(deps.get_current_user)
 ) -> Any:
     """
     Create a new blank chat session.
+    Optionally assign to a workspace via query param.
     """
     chatbot = await prisma.userchatbot.find_unique(where={'userId': current_user.id})
     if not chatbot:
         chatbot = await prisma.userchatbot.create(data={'userId': current_user.id})
-        
-    chat = await prisma.chat.create(
-        data={
-            'userId': current_user.id,
-            'chatbotId': chatbot.id,
-            'source': chat_in.source,
-            'websiteDomain': chat_in.websiteDomain,
-            'pagePath': chat_in.pagePath,
-            'projectName': chat_in.projectName,
-            'name': "New Chat" 
-        }
+
+    chat_data = {
+        'userId': current_user.id,
+        'chatbotId': chatbot.id,
+        'source': chat_in.source,
+        'websiteDomain': chat_in.websiteDomain,
+        'pagePath': chat_in.pagePath,
+        'projectName': chat_in.projectName,
+        'name': "New Chat",
+    }
+    if workspace_id:
+        chat_data['workspaceId'] = workspace_id
+
+    chat = await prisma.chat.create(data=chat_data)
+
+    # Log activity
+    await ActivityService.log_activity(
+        user_id=current_user.id,
+        action="chat_created",
+        entity_type="chat",
+        entity_id=chat.id,
+        entity_name=chat.name,
+        workspace_id=workspace_id,
     )
-    
+
     return ChatCreateResponse(chatId=chat.id, name=chat.name)
 
 
@@ -269,29 +284,92 @@ async def delete_chat(
         raise HTTPException(status_code=404, detail="Chat not found")
     if chat.userId != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-        
+
+    chat_name = chat.name
+    workspace_id = chat.workspaceId
+
     # Cascade delete is now configured in schema, so just delete the chat
     await prisma.chat.delete(where={'id': chat_id})
-    
+
+    # Log activity
+    await ActivityService.log_activity(
+        user_id=current_user.id,
+        action="chat_deleted",
+        entity_type="chat",
+        entity_id=chat_id,
+        entity_name=chat_name,
+        workspace_id=workspace_id,
+    )
+
     return {"success": True, "chatId": chat_id, "message": "Chat deleted successfully"}
 
 
 @router.get("/list", response_model=List[ChatListItem])
 async def list_chats(
+    workspace_id: Optional[str] = None,
     current_user: models.User = Depends(deps.get_current_user)
 ) -> Any:
     """
     Get all chats for the current user.
+    Optionally filter by workspace_id.
     """
+    where_clause: dict = {'userId': current_user.id}
+    if workspace_id:
+        where_clause['workspaceId'] = workspace_id
+
     chats = await prisma.chat.find_many(
-        where={'userId': current_user.id},
+        where=where_clause,
         order={'createdAt': 'desc'}
     )
-    
+
     return [
         ChatListItem(id=chat.id, name=chat.name, createdAt=chat.createdAt)
         for chat in chats
     ]
+
+
+@router.patch("/{chat_id}/pin")
+async def pin_chat(
+    chat_id: str,
+    current_user: models.User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Toggle pin status for a chat.
+    """
+    chat = await prisma.chat.find_unique(where={'id': chat_id})
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if chat.userId != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    updated = await prisma.chat.update(
+        where={'id': chat_id},
+        data={'isPinned': not chat.isPinned}
+    )
+
+    return {"success": True, "chatId": chat_id, "isPinned": updated.isPinned}
+
+
+@router.patch("/{chat_id}/archive")
+async def archive_chat(
+    chat_id: str,
+    current_user: models.User = Depends(deps.get_current_user)
+) -> Any:
+    """
+    Toggle archive status for a chat.
+    """
+    chat = await prisma.chat.find_unique(where={'id': chat_id})
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    if chat.userId != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    updated = await prisma.chat.update(
+        where={'id': chat_id},
+        data={'isArchived': not chat.isArchived}
+    )
+
+    return {"success": True, "chatId": chat_id, "isArchived": updated.isArchived}
 
 
 @router.get("/{chat_id}", response_model=ChatDetailResponse)

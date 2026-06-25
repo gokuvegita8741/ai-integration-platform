@@ -9,6 +9,7 @@ import { ChatActions } from "./ChatActions";
 import { UserNav } from "./UserNav";
 import { ChatListItem } from "@/actions/chat";
 import { useState } from "react";
+import {useRouter} from 'next/navigation';
 
 interface ChatSidebarProps {
     className?: string;
@@ -33,6 +34,7 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
     const [isCreating, setIsCreating] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
+    const router = useRouter();
 
     const handleCreateNew = async () => {
         setIsCreating(true);
@@ -57,7 +59,7 @@ export function ChatSidebar({
         >
             {/* Header */}
             <div className="px-3 py-2 mt-1">
-                <div className="flex items-center gap-3 mb-6">
+                <div onClick={() => router.push('/dashboard')} className="flex cursor-pointer items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
                         <Sparkles className="w-4 h-4" />
                     </div>
