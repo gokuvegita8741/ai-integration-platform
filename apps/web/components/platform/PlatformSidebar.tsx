@@ -12,6 +12,7 @@ import {
     LogOut,
     Sparkles,
     X,
+    BotIcon
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +32,7 @@ interface PlatformSidebarProps {
 const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Workspaces", href: "/workspaces", icon: Boxes },
+    { label: "Chatbot", href: "/chatbot", icon: BotIcon },
     { label: "Search", href: "/search", icon: Search },
     { label: "Settings", href: "/settings", icon: Settings },
 ];

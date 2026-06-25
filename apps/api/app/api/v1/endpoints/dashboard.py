@@ -51,7 +51,7 @@ async def get_dashboard(
     chats = await prisma.chat.find_many(
         where={"userId": current_user.id},
         order={"createdAt": "desc"},
-        take=10,
+        take=5,
         include={"workspace": True},
     )
 
@@ -91,7 +91,7 @@ async def get_dashboard(
     activities = await prisma.activitylog.find_many(
         where={"userId": current_user.id},
         order={"createdAt": "desc"},
-        take=10,
+        take=5,
     )
 
     recent_activity = [
